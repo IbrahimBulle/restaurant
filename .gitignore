@@ -1,0 +1,7 @@
+backend/restaurant.db
+backend/*.db
+backend/tmp/
+frontend/node_modules/
+frontend/dist/
+.env
+.DS_Store
