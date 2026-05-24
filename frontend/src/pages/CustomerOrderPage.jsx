@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { CreditCard, ReceiptText, Smartphone } from "lucide-react";
 import { useParams } from "react-router-dom";
 
@@ -38,6 +38,8 @@ export function CustomerOrderPage() {
   const [error, setError] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
   const [paymentPhone, setPaymentPhone] = useState("+2547");
+  const [nameDraft, setNameDraft] = useState(customerName);
+  const customerNameRef = useRef(customerName);
 
   const deferredSearch = useDeferredValue(search);
 
@@ -47,6 +49,7 @@ export function CustomerOrderPage() {
     () => Object.fromEntries(safeArray(menu.categories).map((category) => [category.id, category])),
     [menu.categories],
   );
+  const showCartPanel = cart.length > 0 || !activeOrder;
 
   const filteredItems = useMemo(() => {
     const needle = deferredSearch.trim().toLowerCase();
@@ -59,6 +62,25 @@ export function CustomerOrderPage() {
       return matchesCategory && matchesSearch;
     });
   }, [activeCategory, deferredSearch, menu.items]);
+
+  useEffect(() => {
+    customerNameRef.current = customerName;
+  }, [customerName]);
+
+  useEffect(() => {
+    setNameDraft(customerName);
+  }, [customerName, tableSlug]);
+
+  const commitCustomerName = useCallback(
+    (value) => {
+      const normalized = value.trim();
+      if (normalized !== customerName) {
+        setCustomerName(tableSlug, normalized);
+      }
+      return normalized;
+    },
+    [customerName, setCustomerName, tableSlug],
+  );
 
   const fetchOrder = useCallback(
     async (orderId, currentSessionToken) => {
@@ -87,7 +109,7 @@ export function CustomerOrderPage() {
         api.get(`/api/public/tables/${tableSlug}`, {
           params: {
             session_token: sessionToken,
-            customer_name: customerName,
+            customer_name: customerNameRef.current,
           },
         }),
       ]);
@@ -120,7 +142,7 @@ export function CustomerOrderPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeCategory, customerName, fetchOrder, sessionToken, setActiveOrderId, setSessionToken, storedOrderId, tableSlug]);
+  }, [activeCategory, fetchOrder, sessionToken, setActiveOrderId, setSessionToken, storedOrderId, tableSlug]);
 
   useEffect(() => {
     refreshContext();
@@ -145,10 +167,11 @@ export function CustomerOrderPage() {
     setPlacing(true);
     setError("");
     try {
+      const submittedName = commitCustomerName(nameDraft);
       const order = await api.post("/api/public/orders", {
         table_id: table?.id,
         session_token: sessionToken,
-        customer_name: customerName || "Guest",
+        customer_name: submittedName || "Guest",
         source: "qr",
         items: cart.map((item) => ({
           menu_item_id: item.id,
@@ -237,13 +260,26 @@ export function CustomerOrderPage() {
           </Notice>
         ) : null}
 
-        <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-5">
-            <Panel className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(246,243,234,0.98))]">
+            {activeOrder ? (
+              <div className="lg:hidden">
+                <ActiveOrderPanel
+                  activeOrder={activeOrder}
+                  paymentPhone={paymentPhone}
+                  onPaymentPhoneChange={setPaymentPhone}
+                  paymentLoading={paymentLoading}
+                  onRequestCash={requestCashPayment}
+                  onRequestMpesa={requestMpesaPayment}
+                />
+              </div>
+            ) : null}
+
+            <Panel className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(246,243,234,0.98))]">
               <SectionHeading
                 eyebrow="Menu"
-                title="Pick your dishes"
-                description="Search quickly, switch categories, and send kitchen notes for every item."
+                title="Choose your dishes"
+                description="Search, tap add, and send the order when you are ready."
                 action={<SearchBar value={search} onChange={(event) => setSearch(event.target.value)} />}
               />
               <CategoryChips categories={safeArray(menu.categories)} activeCategory={activeCategory} onSelect={setActiveCategory} />
@@ -256,7 +292,7 @@ export function CustomerOrderPage() {
               <EmptyState title="No dishes matched that search">Try another keyword or switch to a different category.</EmptyState>
             ) : null}
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {filteredItems.map((item) => (
                 <MenuCard
                   key={item.id}
@@ -269,23 +305,30 @@ export function CustomerOrderPage() {
           </div>
 
           <aside className="hidden space-y-4 lg:block">
-            <OrderSidebar
-              cart={cart}
-              cartTotal={cartTotal}
-              customerName={customerName}
-              onNameChange={(value) => setCustomerName(tableSlug, value)}
-              onDecrease={(item) => setItemQuantity(tableSlug, item.id, item.quantity - 1)}
-              onIncrease={(item) => setItemQuantity(tableSlug, item.id, item.quantity + 1)}
-              onNotesChange={(item, value) => setItemNotes(tableSlug, item.id, value)}
-              onSubmit={placeOrder}
-              placing={placing}
-              activeOrder={activeOrder}
-              paymentPhone={paymentPhone}
-              onPaymentPhoneChange={setPaymentPhone}
-              paymentLoading={paymentLoading}
-              onRequestCash={requestCashPayment}
-              onRequestMpesa={requestMpesaPayment}
-            />
+            {showCartPanel ? (
+              <CartPanel
+                cart={cart}
+                cartTotal={cartTotal}
+                customerName={nameDraft}
+                onNameChange={setNameDraft}
+                onNameCommit={commitCustomerName}
+                onDecrease={(item) => setItemQuantity(tableSlug, item.id, item.quantity - 1)}
+                onIncrease={(item) => setItemQuantity(tableSlug, item.id, item.quantity + 1)}
+                onNotesChange={(item, value) => setItemNotes(tableSlug, item.id, value)}
+                onSubmit={placeOrder}
+                placing={placing}
+              />
+            ) : null}
+            {activeOrder ? (
+              <ActiveOrderPanel
+                activeOrder={activeOrder}
+                paymentPhone={paymentPhone}
+                onPaymentPhoneChange={setPaymentPhone}
+                paymentLoading={paymentLoading}
+                onRequestCash={requestCashPayment}
+                onRequestMpesa={requestMpesaPayment}
+              />
+            ) : null}
           </aside>
         </div>
       </div>
@@ -293,38 +336,108 @@ export function CustomerOrderPage() {
       {cartCount > 0 ? <CartFloatingBar itemCount={cartCount} total={cartTotal} onOpen={() => setCartOpen(true)} /> : null}
 
       <BottomSheet open={cartOpen} title="Your cart" onClose={() => setCartOpen(false)}>
-        <OrderSidebar
-          cart={cart}
-          cartTotal={cartTotal}
-          customerName={customerName}
-          onNameChange={(value) => setCustomerName(tableSlug, value)}
-          onDecrease={(item) => setItemQuantity(tableSlug, item.id, item.quantity - 1)}
-          onIncrease={(item) => setItemQuantity(tableSlug, item.id, item.quantity + 1)}
-          onNotesChange={(item, value) => setItemNotes(tableSlug, item.id, value)}
-          onSubmit={placeOrder}
-          placing={placing}
-          activeOrder={activeOrder}
-          paymentPhone={paymentPhone}
-          onPaymentPhoneChange={setPaymentPhone}
-          paymentLoading={paymentLoading}
-          onRequestCash={requestCashPayment}
-          onRequestMpesa={requestMpesaPayment}
-        />
+        <div className="space-y-4">
+          <CartPanel
+            cart={cart}
+            cartTotal={cartTotal}
+            customerName={nameDraft}
+            onNameChange={setNameDraft}
+            onNameCommit={commitCustomerName}
+            onDecrease={(item) => setItemQuantity(tableSlug, item.id, item.quantity - 1)}
+            onIncrease={(item) => setItemQuantity(tableSlug, item.id, item.quantity + 1)}
+            onNotesChange={(item, value) => setItemNotes(tableSlug, item.id, value)}
+            onSubmit={placeOrder}
+            placing={placing}
+          />
+          {activeOrder ? (
+            <ActiveOrderPanel
+              activeOrder={activeOrder}
+              paymentPhone={paymentPhone}
+              onPaymentPhoneChange={setPaymentPhone}
+              paymentLoading={paymentLoading}
+              onRequestCash={requestCashPayment}
+              onRequestMpesa={requestMpesaPayment}
+            />
+          ) : null}
+        </div>
       </BottomSheet>
     </main>
   );
 }
 
-function OrderSidebar({
+function CartPanel({
   cart,
   cartTotal,
   customerName,
   onNameChange,
+  onNameCommit,
   onDecrease,
   onIncrease,
   onNotesChange,
   onSubmit,
   placing,
+}) {
+  return (
+    <Panel className="bg-[linear-gradient(180deg,#ffffff_0%,#f8f4ec_100%)]">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-bold">
+            <ReceiptText size={18} />
+            Cart
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">{cart.length} dishes selected</p>
+        </div>
+        <span className="rounded-full bg-accent/15 px-3 py-2 text-sm font-bold text-orange-800">{money(cartTotal)}</span>
+      </div>
+
+      <div className="mt-4">
+        <label className="mb-2 block text-sm font-semibold text-slate-700">Guest name</label>
+        <input
+          className="h-11 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+          placeholder="Optional"
+          value={customerName}
+          onChange={(event) => onNameChange(event.target.value)}
+          onBlur={(event) => onNameCommit(event.target.value)}
+        />
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {cart.length === 0 ? (
+          <div className="rounded-[22px] border border-dashed border-border bg-white/70 p-5 text-sm text-slate-600">
+            Add dishes to start your order.
+          </div>
+        ) : null}
+
+        {cart.map((item) => (
+          <CartLine
+            key={item.id}
+            item={item}
+            onDecrease={() => onDecrease(item)}
+            onIncrease={() => onIncrease(item)}
+            onNotesChange={(value) => onNotesChange(item, value)}
+          />
+        ))}
+      </div>
+
+      <div className="mt-5 rounded-[22px] bg-slate-950 p-4 text-white">
+        <div className="flex items-center justify-between text-sm text-slate-300">
+          <span>Total</span>
+          <span>{money(cartTotal)}</span>
+        </div>
+        <div className="mt-2 flex items-center justify-between text-sm text-slate-300">
+          <span>VAT included</span>
+          <span>{money((cartTotal * 16) / 116)}</span>
+        </div>
+      </div>
+
+      <Button className="mt-5 h-12 w-full text-base" disabled={!cart.length || placing} onClick={onSubmit}>
+        {placing ? "Sending order..." : "Place order"}
+      </Button>
+    </Panel>
+  );
+}
+
+function ActiveOrderPanel({
   activeOrder,
   paymentPhone,
   onPaymentPhoneChange,
@@ -332,143 +445,87 @@ function OrderSidebar({
   onRequestCash,
   onRequestMpesa,
 }) {
+  const phoneDigits = paymentPhone.replace(/\D/g, "");
+  const mpesaDisabled = paymentLoading === "mpesa" || phoneDigits.length < 10;
+
   return (
-    <div className="space-y-4">
-      <Panel className="bg-[linear-gradient(180deg,#ffffff_0%,#f8f4ec_100%)]">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="flex items-center gap-2 text-lg font-bold">
-              <ReceiptText size={18} />
-              Your cart
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">{cart.length} dishes selected</p>
-          </div>
-          <span className="rounded-full bg-accent/15 px-3 py-2 text-sm font-bold text-orange-800">{money(cartTotal)}</span>
+    <Panel className="bg-[linear-gradient(160deg,rgba(255,255,255,0.98),rgba(239,248,243,0.96))]">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-500">Live order</p>
+          <h2 className="text-xl font-bold">Order #{activeOrder.id}</h2>
+          <p className="mt-1 text-sm text-slate-500">{formatDateTime(activeOrder.updated_at || activeOrder.created_at)}</p>
         </div>
-
-        <div className="mt-4">
-          <label className="mb-2 block text-sm font-semibold text-slate-700">Name for the order</label>
-          <input
-            className="h-11 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-            placeholder="Guest name"
-            value={customerName}
-            onChange={(event) => onNameChange(event.target.value)}
-          />
+        <div className="flex flex-col items-end gap-2">
+          <StatusBadge status={activeOrder.status} />
+          <StatusBadge status={activeOrder.payment_status} kind="payment" />
         </div>
+      </div>
 
-        <div className="mt-4 space-y-3">
-          {cart.length === 0 ? (
-            <div className="rounded-[22px] border border-dashed border-border bg-white/70 p-5 text-sm text-slate-600">
-              Add a few dishes and they will appear here with quantity controls and kitchen notes.
+      <div className="mt-4 flex items-center justify-between rounded-[20px] bg-white px-4 py-3 shadow-[inset_0_0_0_1px_rgba(221,229,222,0.8)]">
+        <div>
+          <p className="text-sm font-semibold text-slate-500">Amount due</p>
+          <p className="mt-1 text-lg font-bold text-slate-950">{money(activeOrder.total_cents)}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm font-semibold text-slate-500">Payment</p>
+          <p className="mt-1 text-sm font-bold text-slate-950">{paymentStatusLabel(activeOrder.payment_status)}</p>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <OrderTimeline status={activeOrder.status} />
+      </div>
+
+      {(activeOrder.payments || []).length > 0 ? (
+        <div className="mt-4 space-y-2">
+          {(activeOrder.payments || []).map((payment) => (
+            <div key={payment.id} className="rounded-[18px] bg-white p-3 shadow-[inset_0_0_0_1px_rgba(221,229,222,0.8)]">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-semibold text-slate-900">
+                  {paymentMethodLabel(payment.method)} • {money(payment.amount_cents)}
+                </p>
+                <StatusBadge status={payment.status} kind="payment" />
+              </div>
+              {payment.reference ? <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">{payment.reference}</p> : null}
             </div>
-          ) : null}
-
-          {cart.map((item) => (
-            <CartLine
-              key={item.id}
-              item={item}
-              onDecrease={() => onDecrease(item)}
-              onIncrease={() => onIncrease(item)}
-              onNotesChange={(value) => onNotesChange(item, value)}
-            />
           ))}
         </div>
-
-        <div className="mt-5 rounded-[22px] bg-slate-950 p-4 text-white">
-          <div className="flex items-center justify-between text-sm text-slate-300">
-            <span>Subtotal</span>
-            <span>{money(cartTotal)}</span>
-          </div>
-          <div className="mt-2 flex items-center justify-between text-sm text-slate-300">
-            <span>VAT included</span>
-            <span>{money((cartTotal * 16) / 116)}</span>
-          </div>
-          <div className="mt-3 flex items-center justify-between text-lg font-bold">
-            <span>Total</span>
-            <span>{money(cartTotal)}</span>
-          </div>
-        </div>
-
-        <Button className="mt-5 h-12 w-full text-base" disabled={!cart.length || placing} onClick={onSubmit}>
-          {placing ? "Sending order..." : "Send to kitchen"}
-        </Button>
-      </Panel>
-
-      {activeOrder ? (
-        <Panel className="bg-[linear-gradient(160deg,rgba(255,255,255,0.96),rgba(239,248,243,0.96))]">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-slate-500">Live order status</p>
-              <h2 className="text-xl font-bold">Order #{activeOrder.id}</h2>
-              <p className="mt-1 text-sm text-slate-500">{formatDateTime(activeOrder.updated_at || activeOrder.created_at)}</p>
-            </div>
-            <div className="flex flex-col items-end gap-2">
-              <StatusBadge status={activeOrder.status} />
-              <StatusBadge status={activeOrder.payment_status} kind="payment" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <OrderTimeline status={activeOrder.status} />
-          </div>
-          <div className="mt-5 rounded-[22px] bg-white p-4 shadow-[inset_0_0_0_1px_rgba(221,229,222,0.8)]">
-            <p className="text-sm font-semibold text-slate-500">Payment status</p>
-            <p className="mt-2 text-base font-bold text-slate-950">{paymentStatusLabel(activeOrder.payment_status)}</p>
-            <div className="mt-4 space-y-2 text-sm text-slate-600">
-              {(activeOrder.payments || []).map((payment) => (
-                <div key={payment.id} className="rounded-[18px] bg-muted/60 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-semibold text-slate-900">
-                      {paymentMethodLabel(payment.method)} • {money(payment.amount_cents)}
-                    </p>
-                    <StatusBadge status={payment.status} kind="payment" />
-                  </div>
-                  {payment.reference ? <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">{payment.reference}</p> : null}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {activeOrder.payment_status !== "paid" ? (
-            <div className="mt-5 space-y-4">
-              <div className="rounded-[22px] border border-border bg-white p-4">
-                <div className="flex items-center gap-3">
-                  <Smartphone className="text-primary" />
-                  <div>
-                    <p className="font-bold text-slate-950">Pay with M-Pesa</p>
-                    <p className="text-sm text-slate-600">Send an STK push to a Kenyan phone number.</p>
-                  </div>
-                </div>
-                <input
-                  className="mt-4 h-11 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-                  placeholder="+2547..."
-                  value={paymentPhone}
-                  onChange={(event) => onPaymentPhoneChange(event.target.value)}
-                />
-                <Button className="mt-4 w-full" disabled={paymentLoading === "mpesa"} onClick={onRequestMpesa}>
-                  {paymentLoading === "mpesa" ? "Sending prompt..." : "Pay with M-Pesa"}
-                </Button>
-              </div>
-
-              <div className="rounded-[22px] border border-border bg-white p-4">
-                <div className="flex items-center gap-3">
-                  <CreditCard className="text-primary" />
-                  <div>
-                    <p className="font-bold text-slate-950">Pay in cash</p>
-                    <p className="text-sm text-slate-600">The cashier will see the request and settle it from the dashboard.</p>
-                  </div>
-                </div>
-                <Button variant="ghost" className="mt-4 w-full border border-border" disabled={paymentLoading === "cash"} onClick={onRequestCash}>
-                  {paymentLoading === "cash" ? "Sending request..." : "Request cash settlement"}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <Notice title="Payment complete" tone="success" className="mt-5">
-              Your order is fully settled. Ask staff if you want a printed receipt, or save a PDF from the cashier print view.
-            </Notice>
-          )}
-        </Panel>
       ) : null}
-    </div>
+
+      {activeOrder.payment_status !== "paid" ? (
+        <div className="mt-5 rounded-[22px] border border-border bg-white p-4">
+          <div className="flex items-start gap-3">
+            <Smartphone className="mt-0.5 text-primary" />
+            <div>
+              <p className="font-bold text-slate-950">Pay with M-Pesa STK push</p>
+              <p className="text-sm text-slate-600">Use the phone number registered for M-Pesa.</p>
+            </div>
+          </div>
+          <input
+            className="mt-4 h-11 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+            placeholder="+2547..."
+            value={paymentPhone}
+            onChange={(event) => onPaymentPhoneChange(event.target.value)}
+          />
+          <Button className="mt-4 w-full" disabled={mpesaDisabled} onClick={onRequestMpesa}>
+            {paymentLoading === "mpesa" ? "Sending STK push..." : "Pay now with M-Pesa"}
+          </Button>
+          <Button
+            variant="ghost"
+            className="mt-3 w-full border border-border"
+            disabled={paymentLoading === "cash"}
+            onClick={onRequestCash}
+          >
+            <CreditCard size={16} />
+            {paymentLoading === "cash" ? "Sending cash request..." : "Pay with cash instead"}
+          </Button>
+        </div>
+      ) : (
+        <Notice title="Payment complete" tone="success" className="mt-5">
+          Your order is settled.
+        </Notice>
+      )}
+    </Panel>
   );
 }
