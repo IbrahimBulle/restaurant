@@ -28,8 +28,8 @@ Default owner login:
 
 Backend is expected at:
 
-- `http://localhost:8080`
+- `https://restaurantbackend-w0jj.onrender.com`
 
 WebSocket endpoint:
 
-- `ws://localhost:8080/ws`
+- `ws://restaurantbackend-w0jj.onrender.com/ws`

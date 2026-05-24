@@ -19,7 +19,7 @@ services:
       context: .
     environment:
       VITE_API_URL: https://restaurantbackend-w0jj.onrender.com
-      VITE_WS_URL: wss://restaurantbackend-w0jj.onrender.com/ws
+      VITE_WS_URL: ws://restaurantbackend-w0jj.onrender.com/ws
     ports:
       - "4173:4173"
     depends_on:
