@@ -27,6 +27,7 @@ export function CustomerOrderPage() {
 
   const [menu, setMenu] = useState({ categories: [], items: [] });
   const [table, setTable] = useState(null);
+  const [business, setBusiness] = useState(null);
   const [session, setSession] = useState(null);
   const [activeOrder, setActiveOrder] = useState(null);
   const [search, setSearch] = useState("");
@@ -118,6 +119,7 @@ export function CustomerOrderPage() {
         categories: safeArray(menuData.categories),
         items: safeArray(menuData.items),
       });
+      setBusiness(contextData.business || null);
       setTable(contextData.table);
       setSession(contextData.session);
       setSessionToken(tableSlug, contextData.session.token);
@@ -205,7 +207,7 @@ export function CustomerOrderPage() {
         },
       );
       setActiveOrder(result.order);
-      setCashFeedback("Cash request sent. A cashier can settle this order from the payment dashboard.");
+      setCashFeedback("Cash payment request sent. The business can settle it from the owner dashboard.");
     } catch (submitError) {
       setError(submitError.message);
     } finally {
@@ -215,22 +217,28 @@ export function CustomerOrderPage() {
 
   async function requestMpesaPayment() {
     if (!activeOrder?.id || !sessionToken) return;
+    const normalizedPhone = normalizeKenyanPhone(paymentPhone);
+    if (!normalizedPhone) {
+      setError("Enter a valid Kenyan M-Pesa phone number.");
+      return;
+    }
     setPaymentLoading("mpesa");
     setError("");
     setCashFeedback("");
     try {
+      setPaymentPhone(normalizedPhone);
       const result = await api.post(
         `/api/public/orders/${activeOrder.id}/payments/mpesa?session_token=${encodeURIComponent(sessionToken)}`,
         {
           amount_cents: activeOrder.total_cents,
-          phone_number: paymentPhone,
+          phone_number: normalizedPhone,
         },
       );
       setActiveOrder(result.order);
       if (result.order.payment_status === "paid") {
         setCashFeedback("M-Pesa payment confirmed. Your receipt is now available.");
       } else {
-        setCashFeedback("M-Pesa request sent. The cashier will see the update instantly.");
+        setCashFeedback("M-Pesa request sent. Your payment status will update automatically.");
       }
     } catch (submitError) {
       setError(submitError.message);
@@ -240,12 +248,12 @@ export function CustomerOrderPage() {
   }
 
   if (loading) {
-    return <LoadingScreen label="Loading your table menu..." />;
+    return <LoadingScreen label="Loading your ordering page..." />;
   }
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(255,232,202,0.7),transparent_38%),linear-gradient(180deg,#fffdf7_0%,#f3eee4_100%)] text-foreground">
-      <CustomerHero table={table} itemCount={cartCount} activeOrder={activeOrder} />
+      <CustomerHero table={table} business={business} itemCount={cartCount} activeOrder={activeOrder} />
 
       <div className="mx-auto max-w-6xl px-4 py-6">
         {error ? (
@@ -266,8 +274,13 @@ export function CustomerOrderPage() {
               <div className="lg:hidden">
                 <ActiveOrderPanel
                   activeOrder={activeOrder}
+                  business={business}
                   paymentPhone={paymentPhone}
                   onPaymentPhoneChange={setPaymentPhone}
+                  onPaymentPhoneBlur={(value) => {
+                    const normalized = normalizeKenyanPhone(value);
+                    if (normalized) setPaymentPhone(normalized);
+                  }}
                   paymentLoading={paymentLoading}
                   onRequestCash={requestCashPayment}
                   onRequestMpesa={requestMpesaPayment}
@@ -278,18 +291,18 @@ export function CustomerOrderPage() {
             <Panel className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(246,243,234,0.98))]">
               <SectionHeading
                 eyebrow="Menu"
-                title="Choose your dishes"
-                description="Search, tap add, and send the order when you are ready."
+                title="Choose what you want"
+                description="Search, add items, and send the order when you are ready."
                 action={<SearchBar value={search} onChange={(event) => setSearch(event.target.value)} />}
               />
               <CategoryChips categories={safeArray(menu.categories)} activeCategory={activeCategory} onSelect={setActiveCategory} />
             </Panel>
 
             {menu.categories.length === 0 ? (
-              <EmptyState title="No dishes are live yet">The restaurant team still needs to publish the menu.</EmptyState>
+              <EmptyState title="No products are live yet">The business still needs to publish items for this order point.</EmptyState>
             ) : null}
             {filteredItems.length === 0 && menu.categories.length > 0 ? (
-              <EmptyState title="No dishes matched that search">Try another keyword or switch to a different category.</EmptyState>
+              <EmptyState title="No products matched that search">Try another keyword or switch to a different category.</EmptyState>
             ) : null}
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -322,8 +335,13 @@ export function CustomerOrderPage() {
             {activeOrder ? (
               <ActiveOrderPanel
                 activeOrder={activeOrder}
+                business={business}
                 paymentPhone={paymentPhone}
                 onPaymentPhoneChange={setPaymentPhone}
+                onPaymentPhoneBlur={(value) => {
+                  const normalized = normalizeKenyanPhone(value);
+                  if (normalized) setPaymentPhone(normalized);
+                }}
                 paymentLoading={paymentLoading}
                 onRequestCash={requestCashPayment}
                 onRequestMpesa={requestMpesaPayment}
@@ -352,8 +370,13 @@ export function CustomerOrderPage() {
           {activeOrder ? (
             <ActiveOrderPanel
               activeOrder={activeOrder}
+              business={business}
               paymentPhone={paymentPhone}
               onPaymentPhoneChange={setPaymentPhone}
+              onPaymentPhoneBlur={(value) => {
+                const normalized = normalizeKenyanPhone(value);
+                if (normalized) setPaymentPhone(normalized);
+              }}
               paymentLoading={paymentLoading}
               onRequestCash={requestCashPayment}
               onRequestMpesa={requestMpesaPayment}
@@ -385,7 +408,7 @@ function CartPanel({
             <ReceiptText size={18} />
             Cart
           </h2>
-          <p className="mt-1 text-sm text-slate-500">{cart.length} dishes selected</p>
+          <p className="mt-1 text-sm text-slate-500">{cart.length} items selected</p>
         </div>
         <span className="rounded-full bg-accent/15 px-3 py-2 text-sm font-bold text-orange-800">{money(cartTotal)}</span>
       </div>
@@ -404,7 +427,7 @@ function CartPanel({
       <div className="mt-4 space-y-3">
         {cart.length === 0 ? (
           <div className="rounded-[22px] border border-dashed border-border bg-white/70 p-5 text-sm text-slate-600">
-            Add dishes to start your order.
+            Add items to start your order.
           </div>
         ) : null}
 
@@ -439,14 +462,15 @@ function CartPanel({
 
 function ActiveOrderPanel({
   activeOrder,
+  business,
   paymentPhone,
   onPaymentPhoneChange,
+  onPaymentPhoneBlur,
   paymentLoading,
   onRequestCash,
   onRequestMpesa,
 }) {
-  const phoneDigits = paymentPhone.replace(/\D/g, "");
-  const mpesaDisabled = paymentLoading === "mpesa" || phoneDigits.length < 10;
+  const mpesaDisabled = paymentLoading === "mpesa" || !isValidKenyanPhone(paymentPhone);
 
   return (
     <Panel className="bg-[linear-gradient(160deg,rgba(255,255,255,0.98),rgba(239,248,243,0.96))]">
@@ -499,7 +523,10 @@ function ActiveOrderPanel({
             <Smartphone className="mt-0.5 text-primary" />
             <div>
               <p className="font-bold text-slate-950">Pay with M-Pesa STK push</p>
-              <p className="text-sm text-slate-600">Use the phone number registered for M-Pesa.</p>
+              <p className="text-sm text-slate-600">
+                Use the phone number registered for M-Pesa.
+                {business?.mpesa_till ? ` Till/Paybill: ${business.mpesa_till}.` : ""}
+              </p>
             </div>
           </div>
           <input
@@ -507,6 +534,7 @@ function ActiveOrderPanel({
             placeholder="+2547..."
             value={paymentPhone}
             onChange={(event) => onPaymentPhoneChange(event.target.value)}
+            onBlur={(event) => onPaymentPhoneBlur?.(event.target.value)}
           />
           <Button className="mt-4 w-full" disabled={mpesaDisabled} onClick={onRequestMpesa}>
             {paymentLoading === "mpesa" ? "Sending STK push..." : "Pay now with M-Pesa"}
@@ -528,4 +556,16 @@ function ActiveOrderPanel({
       )}
     </Panel>
   );
+}
+
+function normalizeKenyanPhone(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (/^(7|1)\d{8}$/.test(digits)) return `+254${digits}`;
+  if (/^0(7|1)\d{8}$/.test(digits)) return `+254${digits.slice(1)}`;
+  if (/^254(7|1)\d{8}$/.test(digits)) return `+${digits}`;
+  return "";
+}
+
+function isValidKenyanPhone(value) {
+  return Boolean(normalizeKenyanPhone(value));
 }

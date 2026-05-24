@@ -95,7 +95,7 @@ export function EmptyState({ title, children }) {
   );
 }
 
-export function LoadingScreen({ label = "Loading QRDine..." }) {
+export function LoadingScreen({ label = "Loading MauzoHub..." }) {
   return (
     <main className="grid min-h-screen place-items-center bg-[linear-gradient(180deg,#fffdf7_0%,#f4efe5_100%)] px-4">
       <Panel className="max-w-sm text-center">

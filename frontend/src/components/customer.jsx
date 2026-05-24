@@ -4,22 +4,27 @@ import { ORDER_STATUS_FLOW } from "../lib/config";
 import { cn, formatDateTime, money, orderStatusLabel } from "../lib/format";
 import { Button, Panel, StatusBadge } from "./ui";
 
-export function CustomerHero({ table, itemCount, activeOrder }) {
+export function CustomerHero({ table, business, itemCount, activeOrder }) {
+  const pointLabel = orderPointLabel(business?.business_type);
+  const capacityLabel = pointLabel === "Table" ? "seats" : "capacity";
+
   return (
     <header className="relative overflow-hidden border-b border-border bg-white/92 backdrop-blur">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-full bg-[radial-gradient(circle_at_top_right,rgba(226,126,30,0.12),transparent_30%),radial-gradient(circle_at_top_left,rgba(15,61,47,0.12),transparent_24%)]" />
       <div className="relative mx-auto max-w-6xl px-4 py-5">
         <div className="grid gap-4 lg:grid-cols-[1.2fr_320px] lg:items-center">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-primary">Table {table?.number || "..."}</p>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-primary">
+              {business?.business_name || "MauzoHub"} • {pointLabel} {table?.number || "..."}
+            </p>
             <h1 className="mt-2 max-w-2xl text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
-              Order and pay from your table.
+              Browse, order, and pay in a few taps.
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-              Live menu, quick order updates, and M-Pesa or cash payment when you are ready.
+              Live products, fast order updates, and M-Pesa or cash payment when you are ready.
             </p>
             <div className="mt-4 flex flex-wrap gap-2 text-sm font-semibold text-slate-700">
-              <span className="rounded-full bg-white px-3 py-2 shadow-soft">{table?.seats || "-"} seats</span>
+              <span className="rounded-full bg-white px-3 py-2 shadow-soft">{table?.seats || "-"} {capacityLabel}</span>
               <span className="rounded-full bg-white px-3 py-2 shadow-soft">{itemCount} in cart</span>
               <span className="rounded-full bg-white px-3 py-2 shadow-soft">Live order tracking</span>
             </div>
@@ -28,13 +33,13 @@ export function CustomerHero({ table, itemCount, activeOrder }) {
           <Panel className="bg-[linear-gradient(160deg,rgba(15,61,47,0.95),rgba(20,86,67,0.92))] p-4 text-white">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-100">This table</p>
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-100">This {pointLabel.toLowerCase()}</p>
                 <h2 className="mt-2 text-xl font-bold">One live order stream</h2>
               </div>
               <QrCode className="text-emerald-100" />
             </div>
             <p className="mt-3 text-sm leading-6 text-emerald-50/90">
-              Your table is already linked, so the kitchen and cashier see the same order instantly.
+              Your scan is already linked, so the business sees the same order and payment updates instantly.
             </p>
             {activeOrder ? (
               <div className="mt-4 rounded-[22px] bg-white/10 p-4">
@@ -67,7 +72,7 @@ export function SearchBar({ value, onChange }) {
       <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
       <input
         className="h-10 w-full rounded-xl border border-border bg-white pl-11 pr-4 text-sm text-foreground outline-none transition placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/15"
-        placeholder="Search the menu"
+        placeholder="Search products"
         value={value}
         onChange={onChange}
       />
@@ -105,8 +110,8 @@ function MenuArtwork({ item, categoryName }) {
     <div className="flex h-full w-full flex-col justify-between bg-[radial-gradient(circle_at_top_left,rgba(226,126,30,0.95),rgba(15,61,47,0.95))] p-3 text-white">
       <Sparkles size={16} className="opacity-80" />
       <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-white/80">{categoryName || "Chef's pick"}</p>
-        <h3 className="mt-2 text-lg font-bold leading-tight">{item?.name || "Signature Dish"}</h3>
+        <p className="text-xs uppercase tracking-[0.24em] text-white/80">{categoryName || "Top pick"}</p>
+        <h3 className="mt-2 text-lg font-bold leading-tight">{item?.name || "Featured item"}</h3>
       </div>
     </div>
   );
@@ -122,7 +127,7 @@ export function MenuCard({ item, categoryName, onAdd }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent">{categoryName || "Menu"}</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent">{categoryName || "Catalog"}</p>
               <h3 className="mt-1 text-base font-bold leading-tight text-slate-950">{item.name}</h3>
             </div>
             <span className="rounded-full bg-primary/10 px-3 py-1.5 text-sm font-bold text-primary">{money(item.price_cents)}</span>
@@ -130,7 +135,7 @@ export function MenuCard({ item, categoryName, onAdd }) {
           <p className="mt-2 text-sm leading-5 text-slate-600">{item.description}</p>
           <Button className="mt-3 h-10 w-full" size="sm" onClick={() => onAdd(item)}>
             <Plus size={15} />
-            Add
+            Add to cart
           </Button>
         </div>
       </div>
@@ -189,16 +194,24 @@ export function CartLine({ item, onDecrease, onIncrease, onNotesChange }) {
             <Plus size={16} />
           </button>
         </div>
-        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Kitchen note</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Order note</span>
       </div>
       <input
         className="mt-3 h-10 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/15"
-        placeholder="No onions, extra spicy, split plate..."
+        placeholder="Special request, color, size, pickup note..."
         value={item.notes}
         onChange={(event) => onNotesChange(event.target.value)}
       />
     </div>
   );
+}
+
+function orderPointLabel(businessType) {
+  const type = String(businessType || "").toLowerCase();
+  if (/(restaurant|cafe|hotel|bar|grill|diner)/.test(type)) {
+    return "Table";
+  }
+  return "Order point";
 }
 
 export function OrderTimeline({ status }) {

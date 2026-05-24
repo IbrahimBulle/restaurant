@@ -2,34 +2,24 @@ import { Component } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 
 import { Notice } from "./components/ui";
-import { ROLE_HOME } from "./lib/config";
+import { OWNER_HOME } from "./lib/config";
 import { useAuthStore } from "./store/auth-store";
 import { CustomerOrderPage } from "./pages/CustomerOrderPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
 
-function roleHome(role) {
-  return ROLE_HOME[role] || "/app/admin";
-}
-
 function RootRedirect() {
   const token = useAuthStore((state) => state.token);
-  const user = useAuthStore((state) => state.user);
   if (!token) return <Navigate to="/app/login" replace />;
-  if (user?.role) return <Navigate to={roleHome(user.role)} replace />;
-  return <Navigate to="/app/admin" replace />;
+  return <Navigate to={OWNER_HOME} replace />;
 }
 
-function ProtectedRoute({ roles }) {
+function ProtectedRoute() {
   const token = useAuthStore((state) => state.token);
-  const user = useAuthStore((state) => state.user);
   const location = useLocation();
 
   if (!token) {
     return <Navigate to="/app/login" replace state={{ from: location }} />;
-  }
-  if (user?.role && roles?.length && !roles.includes(user.role)) {
-    return <Navigate to={roleHome(user.role)} replace />;
   }
   return <Outlet />;
 }
@@ -48,7 +38,7 @@ class ErrorBoundary extends Component {
     if (this.state.error) {
       return (
         <main className="grid min-h-screen place-items-center bg-background px-4">
-          <Notice title="QRDine could not render this screen" tone="danger">
+          <Notice title="MauzoHub could not render this screen" tone="danger">
             {this.state.error.message}
           </Notice>
         </main>
@@ -69,22 +59,12 @@ export function App() {
 
           <Route element={<ProtectedRoute />}>
             <Route path="/app" element={<RootRedirect />} />
-          </Route>
-
-          <Route element={<ProtectedRoute roles={["admin", "manager"]} />}>
-            <Route path="/app/admin" element={<DashboardPage mode="admin" />} />
-          </Route>
-
-          <Route element={<ProtectedRoute roles={["chef"]} />}>
-            <Route path="/app/chef" element={<DashboardPage mode="chef" />} />
-          </Route>
-
-          <Route element={<ProtectedRoute roles={["waiter"]} />}>
-            <Route path="/app/waiter" element={<DashboardPage mode="waiter" />} />
-          </Route>
-
-          <Route element={<ProtectedRoute roles={["cashier"]} />}>
-            <Route path="/app/cashier" element={<DashboardPage mode="cashier" />} />
+            <Route path="/app/dashboard" element={<DashboardPage />} />
+            <Route path="/app/dashboard/:section" element={<DashboardPage />} />
+            <Route path="/app/admin" element={<Navigate to={OWNER_HOME} replace />} />
+            <Route path="/app/chef" element={<Navigate to={OWNER_HOME} replace />} />
+            <Route path="/app/waiter" element={<Navigate to={OWNER_HOME} replace />} />
+            <Route path="/app/cashier" element={<Navigate to={OWNER_HOME} replace />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

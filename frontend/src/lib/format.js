@@ -57,7 +57,7 @@ export function orderStatusLabel(status) {
     case "ready":
       return "Ready";
     case "served":
-      return "Served";
+      return "Completed";
     case "paid":
       return "Paid";
     case "cancelled":
