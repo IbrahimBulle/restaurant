@@ -25,13 +25,25 @@ const emptyReports = {
 
 const adminTabs = [
   ["overview", "Overview"],
+  ["menu", "Menu"],
+  ["tables", "Tables"],
+  ["staff", "Staff"],
+];
+
+const managerTabs = [
+  ["overview", "Overview"],
   ["kitchen", "Kitchen"],
   ["waiter", "Floor"],
   ["cashier", "Cashier"],
   ["menu", "Menu"],
   ["tables", "Tables"],
-  ["staff", "Staff"],
 ];
+
+const roleViews = {
+  chef: "kitchen",
+  waiter: "waiter",
+  cashier: "cashier",
+};
 
 export function DashboardPage({ mode = "admin" }) {
   const navigate = useNavigate();
@@ -50,8 +62,10 @@ export function DashboardPage({ mode = "admin" }) {
   const [adminTab, setAdminTab] = useState("overview");
 
   const role = user?.role || "";
-  const adminLike = role === "admin" || role === "manager";
-  const currentView = adminLike ? adminTab : mode;
+  const isAdmin = role === "admin";
+  const isManager = role === "manager";
+  const adminLike = isAdmin || isManager;
+  const currentView = adminLike ? adminTab : roleViews[role] || mode;
 
   const refresh = useCallback(async () => {
     if (!token) return;
@@ -110,7 +124,8 @@ export function DashboardPage({ mode = "admin" }) {
   }, [adminLike, mode, navigate, user?.role]);
 
   const headerTabs = useMemo(() => {
-    if (adminLike) return adminTabs;
+    if (isAdmin) return adminTabs;
+    if (isManager) return managerTabs;
     switch (role) {
       case "chef":
         return [["kitchen", "Kitchen"]];
@@ -121,7 +136,14 @@ export function DashboardPage({ mode = "admin" }) {
       default:
         return [];
     }
-  }, [adminLike, role]);
+  }, [isAdmin, isManager, role]);
+
+  useEffect(() => {
+    if (!headerTabs.length) return;
+    if (!headerTabs.some(([tabId]) => tabId === adminTab)) {
+      setAdminTab(headerTabs[0][0]);
+    }
+  }, [adminTab, headerTabs]);
 
   async function updateStatus(orderId, status) {
     await api.patch(`/api/orders/${orderId}/status`, { status });

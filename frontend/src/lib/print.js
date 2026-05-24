@@ -8,8 +8,12 @@ export function escapeHtml(value) {
 }
 
 export function openPrintWindow(title, content) {
-  const printWindow = window.open("", "_blank", "noopener,noreferrer,width=1100,height=900");
-  if (!printWindow) return;
+  const printWindow = window.open("", "_blank", "width=1100,height=900");
+  if (!printWindow) {
+    window.alert("Allow pop-ups in your browser to print this page.");
+    return false;
+  }
+  printWindow.document.open();
   printWindow.document.write(`<!doctype html>
     <html>
       <head>
@@ -27,6 +31,28 @@ export function openPrintWindow(title, content) {
           .sheet {
             display: grid;
             gap: 24px;
+          }
+          .toolbar {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-bottom: 18px;
+          }
+          .toolbar button {
+            border: 0;
+            border-radius: 999px;
+            padding: 12px 18px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+          }
+          .toolbar button:first-child {
+            background: #0f6b52;
+            color: white;
+          }
+          .toolbar button:last-child {
+            background: #e8eee9;
+            color: #13211d;
           }
           .card {
             background: white;
@@ -81,15 +107,49 @@ export function openPrintWindow(title, content) {
             text-align: right;
           }
           @media print {
+            .toolbar { display: none; }
             body { padding: 0; background: white; }
           }
         </style>
       </head>
-      <body>${content}</body>
+      <body>
+        <div class="toolbar">
+          <button type="button" id="print-trigger">Print</button>
+          <button type="button" id="close-trigger">Close</button>
+        </div>
+        ${content}
+        <script>
+          const printButton = document.getElementById("print-trigger");
+          const closeButton = document.getElementById("close-trigger");
+          const waitForImages = () => {
+            const images = Array.from(document.images || []);
+            return Promise.all(
+              images.map((image) => {
+                if (image.complete) return Promise.resolve();
+                return new Promise((resolve) => {
+                  image.addEventListener("load", resolve, { once: true });
+                  image.addEventListener("error", resolve, { once: true });
+                });
+              }),
+            );
+          };
+          const triggerPrint = async () => {
+            await waitForImages();
+            window.focus();
+            window.print();
+          };
+          printButton?.addEventListener("click", triggerPrint);
+          closeButton?.addEventListener("click", () => window.close());
+          window.addEventListener(
+            "load",
+            () => {
+              window.setTimeout(triggerPrint, 250);
+            },
+            { once: true },
+          );
+        </script>
+      </body>
     </html>`);
   printWindow.document.close();
-  printWindow.focus();
-  setTimeout(() => {
-    printWindow.print();
-  }, 200);
+  return true;
 }

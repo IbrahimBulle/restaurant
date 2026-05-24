@@ -25,12 +25,18 @@ function categoryMap(categories) {
 
 export function KitchenQueue({ orders, onStatus }) {
   const active = orders.filter((order) => ["new", "accepted", "preparing"].includes(order.status));
+  const ready = orders.filter((order) => order.status === "ready");
+  const completed = orders.filter((order) => ["served", "paid"].includes(order.status)).slice(0, 6);
+  const queuedCount = orders.filter((order) => order.status === "new").length;
+  const acceptedCount = orders.filter((order) => order.status === "accepted").length;
+  const preparingCount = orders.filter((order) => order.status === "preparing").length;
+
   return (
-    <div>
+    <div className="space-y-5">
       <SectionHeading
         eyebrow="Kitchen"
-        title="Live prep queue"
-        description="New QR orders land here immediately, with clear notes for the kitchen and fast status actions."
+        title="Kitchen control center"
+        description="Run the full kitchen from one screen: accept new tickets, move dishes through prep, and keep handoff to the floor moving."
         action={
           <div className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-primary shadow-soft">
             <Bell size={16} />
@@ -38,13 +44,81 @@ export function KitchenQueue({ orders, onStatus }) {
           </div>
         }
       />
-      {active.length === 0 ? (
-        <EmptyState title="No active kitchen tickets">As soon as a guest places an order from a table QR code, it will appear here.</EmptyState>
-      ) : null}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {active.map((order) => (
-          <OrderTicket key={order.id} order={order} onStatus={onStatus} />
-        ))}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="New tickets" value={queuedCount} hint="Waiting for kitchen acceptance" />
+        <MetricCard label="Accepted" value={acceptedCount} hint="Seen by the chef team" />
+        <MetricCard label="Preparing" value={preparingCount} hint="Currently on the line" />
+        <MetricCard label="Ready" value={ready.length} hint="Waiting for waiter pickup" />
+      </div>
+
+      <section>
+        <SectionHeading
+          eyebrow="Prep queue"
+          title="Active kitchen tickets"
+          description="These are the dishes the chef team can act on right now."
+        />
+        {active.length === 0 ? (
+          <EmptyState title="No active kitchen tickets">As soon as a guest places an order from a table QR code, it will appear here.</EmptyState>
+        ) : null}
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {active.map((order) => (
+            <OrderTicket key={order.id} order={order} onStatus={onStatus} />
+          ))}
+        </div>
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
+        <Panel>
+          <SectionHeading
+            eyebrow="Pass"
+            title="Ready for pickup"
+            description="Orders marked ready stay visible here until the waiter serves them."
+          />
+          <div className="space-y-3">
+            {ready.length === 0 ? <p className="text-sm text-slate-500">Nothing is waiting on the pass right now.</p> : null}
+            {ready.map((order) => (
+              <div key={order.id} className="rounded-[22px] bg-muted/60 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-bold text-slate-950">Order #{order.id}</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Table {order.table_number || order.table_id || "Walk-in"} • {order.items?.length || 0} items
+                    </p>
+                    <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">
+                      Ready since {formatDateTime(order.updated_at)}
+                    </p>
+                  </div>
+                  <StatusBadge status={order.status} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel>
+          <SectionHeading
+            eyebrow="Completed"
+            title="Recently finished tickets"
+            description="Quick kitchen history for the latest served or fully paid orders."
+          />
+          <div className="space-y-3">
+            {completed.length === 0 ? <p className="text-sm text-slate-500">Finished kitchen work will appear here as service progresses.</p> : null}
+            {completed.map((order) => (
+              <div key={order.id} className="rounded-[22px] bg-muted/60 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-bold text-slate-950">Order #{order.id}</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Table {order.table_number || order.table_id || "Walk-in"} • {order.items?.length || 0} items
+                    </p>
+                  </div>
+                  <StatusBadge status={order.status} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
       </div>
     </div>
   );
@@ -299,8 +373,8 @@ export function AdminOverview({ reports, tables, orders }) {
     <div className="space-y-5">
       <SectionHeading
         eyebrow="Overview"
-        title="Restaurant control tower"
-        description="Daily sales, payment mix, table throughput, and operational hotspots in one place."
+        title="Restaurant summary"
+        description="A high-level view for admin: revenue, best sellers, table status, and recent service activity without kitchen controls."
       />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Today" value={money(reports?.daily_total_cents)} hint="Paid revenue today" />
@@ -409,6 +483,40 @@ export function AdminOverview({ reports, tables, orders }) {
           </div>
         </Panel>
       </div>
+
+      <Panel>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-500">Recent activity</p>
+            <h3 className="text-2xl font-bold text-slate-950">Latest orders at a glance</h3>
+          </div>
+          <Users className="text-primary" />
+        </div>
+        <div className="mt-5 space-y-3">
+          {orders.length === 0 ? <p className="text-sm text-slate-500">Recent order activity will show up after the first guest order.</p> : null}
+          {orders.slice(0, 5).map((order) => (
+            <div key={order.id} className="rounded-[22px] bg-muted/60 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-slate-950">
+                    Order #{order.id} • Table {order.table_number || order.table_id || "Walk-in"}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {order.items?.length || 0} items • {money(order.total_cents)}
+                  </p>
+                  <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">
+                    Updated {formatDateTime(order.updated_at)}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <StatusBadge status={order.status} />
+                  <StatusBadge status={order.payment_status} kind="payment" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Panel>
     </div>
   );
 }
