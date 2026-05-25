@@ -49,7 +49,7 @@ export const moreSections = ["qr", "payments", "analytics", "receipts", "setting
 
 export function DesktopSidebar({ activeSection, businessName, onNavigate }) {
   return (
-    <aside className="hidden lg:flex lg:w-72 lg:flex-col lg:rounded-[32px] lg:border lg:border-white/70 lg:bg-white/88 lg:p-5 lg:shadow-soft lg:backdrop-blur">
+    <aside className="hidden lg:flex lg:h-screen lg:w-72 lg:flex-col lg:rounded-[32px] lg:border lg:border-white/70 lg:bg-white/88 lg:p-5 lg:shadow-soft lg:backdrop-blur">
       <div className="rounded-[28px] bg-[linear-gradient(160deg,rgba(15,61,47,0.98),rgba(20,86,67,0.94))] p-5 text-white">
         <div className="flex items-center gap-3">
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/12">
@@ -65,7 +65,7 @@ export function DesktopSidebar({ activeSection, businessName, onNavigate }) {
         </p>
       </div>
 
-      <nav className="mt-5 space-y-2">
+      <nav className="mt-5 flex-1 space-y-2 overflow-y-auto">
         {desktopSections.map((section) => {
           const Icon = sectionMeta[section].icon;
           const selected = section === activeSection;
