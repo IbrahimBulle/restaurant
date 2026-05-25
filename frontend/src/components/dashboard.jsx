@@ -23,6 +23,7 @@ import {
   Tag,
   Trash2,
   Wallet,
+  X,
 } from "lucide-react";
 
 import { useQrCode } from "../hooks/useQrCode";
@@ -392,6 +393,7 @@ function OrderCard({ order, onStatus, onCashPaid, onConfirmMpesa, onPrintReceipt
     ["served", "Completed"],
     ["paid", "Paid"],
   ];
+  const canBeCancelled = order.status !== "paid" && order.status !== "served" && order.status !== "cancelled";
 
   return (
     <Panel>
@@ -453,6 +455,12 @@ function OrderCard({ order, onStatus, onCashPaid, onConfirmMpesa, onPrintReceipt
               <Button size="sm" variant="ghost" className="w-full border border-border" onClick={() => onPrintReceipt(order)}>
                 <Printer size={16} />
                 Print receipt
+              </Button>
+            ) : null}
+            {canBeCancelled ? (
+              <Button size="sm" variant="ghost" className="w-full border border-border text-red-700 hover:bg-red-50" onClick={() => onStatus(order.id, "cancelled")}>
+                <X size={16} />
+                Cancel order
               </Button>
             ) : null}
           </div>
